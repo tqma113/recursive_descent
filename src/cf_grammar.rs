@@ -57,8 +57,8 @@ macro_rules! cf_grammar {
 
             $crate::cf_grammar::ContextFreeGrammar::new(
                 start_terminal,
-                non_terminals,
                 terminals,
+                non_terminals,
                 table,
             )
         }

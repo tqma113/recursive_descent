@@ -39,6 +39,16 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
 
     fn walk(&mut self) -> Result<Vec<(Symbol, u8)>, Diagnostic> {
         loop {
+            println!("{}", self.index);
+            for (symbol, index) in self.stack.iter().rev() {
+                print!("{}{} ", symbol, index);
+            }
+            println!();
+            for (symbol, index) in &self.analysis_stack {
+                print!("{}{} ", symbol, index);
+            }
+            println!();
+            println!();
             match self.stack.pop() {
                 Some((left, index)) => {
                     if left.eq(&sym::END) {
@@ -54,7 +64,8 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
                                     self.push();
                                     self.analysis_stack.push((left, index));
                                 } else {
-                                    self.backtrack(left, index);
+                                    self.stack.push((left, index));
+                                    self.backtrack();
                                 }
                             }
                             Category::NonTerminal => {
@@ -72,6 +83,7 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
                                             Some((symbol, index)) => {
                                                 match self.grammar.category(&symbol) {
                                                     Category::Terminal => {
+                                                        println!("{}{}", symbol, index);
                                                         unreachable!("Backtracking should stop before the analysis stack became empty.")
                                                     },
                                                     Category::NonTerminal => {
@@ -105,16 +117,26 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
         }
     }
 
-    fn backtrack(&mut self, mut symbol: Symbol, mut index: u8) {
+    fn backtrack(&mut self) {
+        println!("backtrack");
         loop {
-            self.stack.push((symbol, index));
-            self.pop();
+            println!("{}", self.index);
+            for (symbol, index) in self.stack.iter().rev() {
+                print!("{}{} ", symbol, index);
+            }
+            println!();
+            for (symbol, index) in &self.analysis_stack {
+                print!("{}{} ", symbol, index);
+            }
+            println!();
+            println!();
             match self.analysis_stack.pop() {
-                Some((sym, i)) => {
-                    match self.grammar.category(&sym) {
+                Some((symbol, index)) => {
+                    println!("{}{}\n", symbol, index);
+                    match self.grammar.category(&symbol) {
                         Category::Terminal => {
-                            symbol = sym;
-                            index = i;
+                            self.stack.push((symbol, index));
+                            self.pop();
                         },
                         Category::NonTerminal => {
                             for _ in 0..self.grammar.len(&symbol, index) {
