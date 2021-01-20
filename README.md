@@ -2,4 +2,10 @@
 
 Detail in 6.6 of Parsing Technique.
 
-Breadth-first
+For 2 Type(context-free).
+
+Depth-first
+
+LL
+
+Without left-recursive(need transform).
