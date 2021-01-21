@@ -1,10 +1,10 @@
 extern crate recursive_descent;
 
-use recursive_descent::{cf_grammar, parser};
 use parser::Parser;
+use recursive_descent::{cf_grammar, parser};
 
 fn main() {
-    let grammar = cf_grammar!{
+    let grammar = cf_grammar! {
         Start("S");
         NonTerminals [
             "S", "A", "B", "C", "D"

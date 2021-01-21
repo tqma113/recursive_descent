@@ -1,6 +1,6 @@
-use super::cf_grammar::{Grammar, sym, Category};
-use super::symbol::Symbol;
+use super::cf_grammar::{sym, Category, Grammar};
 use super::error::*;
+use super::symbol::Symbol;
 
 use std::fmt::Debug;
 
@@ -13,7 +13,7 @@ pub struct Parser<'a, G: Grammar + Debug + Clone> {
     index: usize,
 
     analysis_stack: Vec<(Symbol, u8)>,
-    stack: Vec<(Symbol, u8)>
+    stack: Vec<(Symbol, u8)>,
 }
 
 impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
@@ -24,13 +24,17 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
             symbols: vec![],
             index: 0,
             analysis_stack: vec![],
-            stack: vec![]
+            stack: vec![],
         }
     }
 
     pub fn parse(&mut self, string: &'a str) -> Result<Vec<(Symbol, u8)>, Diagnostic> {
         self.src = string;
-        self.symbols = self.src.chars().map(|c| Symbol::intern(c.to_string().as_str())).collect();
+        self.symbols = self
+            .src
+            .chars()
+            .map(|c| Symbol::intern(c.to_string().as_str()))
+            .collect();
         self.stack.push((*sym::END, 0));
         self.stack.push((self.grammar.start(), 0));
 
@@ -39,24 +43,17 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
 
     fn walk(&mut self) -> Result<Vec<(Symbol, u8)>, Diagnostic> {
         loop {
-            println!("{}", self.index);
-            for (symbol, index) in self.stack.iter().rev() {
-                print!("{}{} ", symbol, index);
-            }
-            println!();
-            for (symbol, index) in &self.analysis_stack {
-                print!("{}{} ", symbol, index);
-            }
-            println!();
-            println!();
             match self.stack.pop() {
                 Some((left, index)) => {
                     if left.eq(&sym::END) {
                         return if self.is_eos() {
                             Ok(self.analysis_stack.clone())
                         } else {
-                            Err(Diagnostic::End(EndDiagnostic::new(self.analysis_stack.clone(), self.index)))
-                        }
+                            Err(Diagnostic::End(EndDiagnostic::new(
+                                self.analysis_stack.clone(),
+                                self.index,
+                            )))
+                        };
                     } else {
                         match self.grammar.category(&left) {
                             Category::Terminal => {
@@ -68,44 +65,42 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
                                     self.backtrack();
                                 }
                             }
-                            Category::NonTerminal => {
-                                match self.grammar.next(&left, index) {
-                                    Some(symbols) => {
-                                        let mut symbols = symbols.clone();
-                                        self.analysis_stack.push((left, index + 1));
-                                        symbols.reverse();
-                                        for symbol in symbols {
-                                            self.stack.push((symbol, 0))
+                            Category::NonTerminal => match self.grammar.next(&left, index) {
+                                Some(symbols) => {
+                                    self.refresh();
+                                    let mut symbols = symbols.clone();
+                                    self.analysis_stack.push((left, index + 1));
+                                    symbols.reverse();
+                                    for symbol in symbols {
+                                        self.stack.push((symbol, 0))
+                                    }
+                                }
+                                None => match self.analysis_stack.pop() {
+                                    Some((symbol, index)) => match self.grammar.category(&symbol) {
+                                        Category::Terminal => {
+                                            unreachable!("Backtracking should stop before the analysis stack became empty.")
+                                        }
+                                        Category::NonTerminal => {
+                                            for _ in 0..(self.grammar.len(&symbol, index) - 1) {
+                                                self.stack.pop();
+                                            }
+                                            self.stack.push((symbol, index));
+                                        }
+                                        Category::Unknown => {
+                                            return Err(Diagnostic::Input(InputDiagnostic::new(
+                                                left, self.index,
+                                            )))
                                         }
                                     },
                                     None => {
-                                        match self.analysis_stack.pop() {
-                                            Some((symbol, index)) => {
-                                                match self.grammar.category(&symbol) {
-                                                    Category::Terminal => {
-                                                        println!("{}{}", symbol, index);
-                                                        unreachable!("Backtracking should stop before the analysis stack became empty.")
-                                                    },
-                                                    Category::NonTerminal => {
-                                                        for _ in 0..(self.grammar.len(&symbol, index) - 1) {
-                                                            self.stack.pop();
-                                                        }
-                                                        self.stack.push((symbol, index));
-                                                    }
-                                                    Category::Unknown => {
-                                                        return Err(Diagnostic::Input(InputDiagnostic::new(left, self.index)))
-                                                    }
-                                                }
-                                            }
-                                            None => {
-                                                unreachable!("Backtracking should stop before the analysis stack became empty.")
-                                            }
-                                        }
+                                        unreachable!("Backtracking should stop before the analysis stack became empty.")
                                     }
-                                }
-                            }
+                                },
+                            },
                             Category::Unknown => {
-                                return Err(Diagnostic::Input(InputDiagnostic::new(left, self.index)))
+                                return Err(Diagnostic::Input(InputDiagnostic::new(
+                                    left, self.index,
+                                )))
                             }
                         }
                     }
@@ -118,32 +113,23 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
     }
 
     fn backtrack(&mut self) {
-        println!("backtrack");
         loop {
-            println!("{}", self.index);
-            for (symbol, index) in self.stack.iter().rev() {
-                print!("{}{} ", symbol, index);
-            }
-            println!();
-            for (symbol, index) in &self.analysis_stack {
-                print!("{}{} ", symbol, index);
-            }
-            println!();
-            println!();
             match self.analysis_stack.pop() {
                 Some((symbol, index)) => {
-                    println!("{}{}\n", symbol, index);
                     match self.grammar.category(&symbol) {
                         Category::Terminal => {
                             self.stack.push((symbol, index));
                             self.pop();
-                        },
+                        }
                         Category::NonTerminal => {
                             for _ in 0..self.grammar.len(&symbol, index) {
                                 self.stack.pop();
                             }
                             self.stack.push((symbol, index));
-                            break;
+                            match self.grammar.next(&symbol, index) {
+                                Some(_) => break,
+                                None => {}
+                            }
                         }
                         Category::Unknown => {
                             unreachable!("Unknown symbol should report before.")
@@ -155,6 +141,12 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
                 }
             }
         }
+    }
+
+    fn refresh(&mut self) {
+        self.stack.iter_mut().for_each(|pair| {
+            pair.1 = 0;
+        });
     }
 
     fn is_eos(&self) -> bool {

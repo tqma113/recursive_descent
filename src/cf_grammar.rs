@@ -1,6 +1,6 @@
 use super::symbol::Symbol;
 
-pub use std::collections::{HashSet, HashMap};
+pub use std::collections::{HashMap, HashSet};
 
 #[macro_export]
 macro_rules! cf_grammar {
@@ -68,7 +68,7 @@ macro_rules! cf_grammar {
 pub enum Category {
     Terminal,
     NonTerminal,
-    Unknown
+    Unknown,
 }
 
 pub trait Grammar {
@@ -90,13 +90,12 @@ pub mod sym {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct ContextFreeGrammar {
     start: Symbol,
     terminals: HashSet<Symbol>,
     non_terminals: HashSet<Symbol>,
-    table: HashMap<Symbol, Vec<Vec<Symbol>>>
+    table: HashMap<Symbol, Vec<Vec<Symbol>>>,
 }
 
 impl ContextFreeGrammar {
@@ -132,22 +131,18 @@ impl Grammar for ContextFreeGrammar {
 
     fn next(&self, input: &Symbol, index: u8) -> Option<&Vec<Symbol>> {
         match self.table.get(input) {
-            Some(list) => {
-                list.get(index as usize)
-            },
-            None => None
+            Some(list) => list.get(index as usize),
+            None => None,
         }
     }
 
     fn len(&self, input: &Symbol, index: u8) -> usize {
         match self.table.get(input) {
-            Some(list) => {
-                match list.get(index as usize) {
-                    Some(list) => list.len(),
-                    None => 0
-                }
+            Some(list) => match list.get((index - 1) as usize) {
+                Some(list) => list.len(),
+                None => 0,
             },
-            None => 0
+            None => 0,
         }
     }
 }
