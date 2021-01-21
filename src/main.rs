@@ -4,6 +4,14 @@ use parser::Parser;
 use recursive_descent::{cf_grammar, parser};
 
 fn main() {
+    /*
+    Detail in 6.6 of Parsing Technique.
+    S -> DC | AB
+    A -> a | aA
+    B -> bc | bBc
+    D -> ab | aDb
+    C -> c | cC
+     */
     let grammar = cf_grammar! {
         Start("S");
         NonTerminals [
