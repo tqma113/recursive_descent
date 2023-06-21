@@ -68,10 +68,10 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
                             Category::NonTerminal => match self.grammar.next(&left, index) {
                                 Some(symbols) => {
                                     self.refresh();
-                                    let mut symbols = symbols.clone();
+
                                     self.analysis_stack.push((left, index + 1));
-                                    symbols.reverse();
-                                    for symbol in symbols {
+
+                                    for &symbol in symbols.clone().iter().rev() {
                                         self.stack.push((symbol, 0))
                                     }
                                 }
@@ -115,27 +115,25 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
     fn backtrack(&mut self) {
         loop {
             match self.analysis_stack.pop() {
-                Some((symbol, index)) => {
-                    match self.grammar.category(&symbol) {
-                        Category::Terminal => {
-                            self.stack.push((symbol, index));
-                            self.pop();
+                Some((symbol, index)) => match self.grammar.category(&symbol) {
+                    Category::Terminal => {
+                        self.stack.push((symbol, index));
+                        self.pop();
+                    }
+                    Category::NonTerminal => {
+                        for _ in 0..self.grammar.len(&symbol, index) {
+                            self.stack.pop();
                         }
-                        Category::NonTerminal => {
-                            for _ in 0..self.grammar.len(&symbol, index) {
-                                self.stack.pop();
-                            }
-                            self.stack.push((symbol, index));
-                            match self.grammar.next(&symbol, index) {
-                                Some(_) => break,
-                                None => {}
-                            }
-                        }
-                        Category::Unknown => {
-                            unreachable!("Unknown symbol should report before.")
+                        self.stack.push((symbol, index));
+                        match self.grammar.next(&symbol, index) {
+                            Some(_) => break,
+                            None => {}
                         }
                     }
-                }
+                    Category::Unknown => {
+                        unreachable!("Unknown symbol should report before.")
+                    }
+                },
                 None => {
                     unreachable!("Backtracking should stop before the analysis stack became empty.")
                 }
