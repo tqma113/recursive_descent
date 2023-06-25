@@ -11,9 +11,10 @@ pub struct Parser<'a, G: Grammar + Debug + Clone> {
 
     symbols: Vec<Symbol>,
     index: usize,
-
-    analysis_stack: Vec<(Symbol, u8)>,
     stack: Vec<(Symbol, u8)>,
+
+    pub analysis_stack: Vec<(Symbol, u8)>,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
@@ -25,10 +26,11 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
             index: 0,
             analysis_stack: vec![],
             stack: vec![],
+            diagnostics: vec![],
         }
     }
 
-    pub fn parse(&mut self, string: &'a str) -> Result<Vec<(Symbol, u8)>, Diagnostic> {
+    pub fn parse(&mut self, string: &'a str) -> bool {
         self.src = string;
         self.symbols = self
             .src
@@ -41,18 +43,19 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
         self.walk()
     }
 
-    fn walk(&mut self) -> Result<Vec<(Symbol, u8)>, Diagnostic> {
+    fn walk(&mut self) -> bool {
         loop {
             match self.stack.pop() {
                 Some((left, index)) => {
                     if left.eq(&sym::END) {
                         return if self.is_eos() {
-                            Ok(self.analysis_stack.clone())
+                            true
                         } else {
-                            Err(Diagnostic::End(EndDiagnostic::new(
+                            self.diagnostics.push(Diagnostic::End(EndDiagnostic::new(
                                 self.analysis_stack.clone(),
                                 self.index,
-                            )))
+                            )));
+                            false
                         };
                     } else {
                         match self.grammar.category(&left) {
@@ -87,9 +90,10 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
                                             self.stack.push((symbol, index));
                                         }
                                         Category::Unknown => {
-                                            return Err(Diagnostic::Input(InputDiagnostic::new(
-                                                left, self.index,
-                                            )))
+                                            self.diagnostics.push(Diagnostic::Input(
+                                                InputDiagnostic::new(left, self.index),
+                                            ));
+                                            return false;
                                         }
                                     },
                                     None => {
@@ -98,9 +102,11 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
                                 },
                             },
                             Category::Unknown => {
-                                return Err(Diagnostic::Input(InputDiagnostic::new(
-                                    left, self.index,
-                                )))
+                                self.diagnostics
+                                    .push(Diagnostic::Input(InputDiagnostic::new(
+                                        left, self.index,
+                                    )));
+                                return false;
                             }
                         }
                     }

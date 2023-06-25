@@ -46,11 +46,15 @@ fn main() {
     println!("{:?}", &grammar);
     let mut parser = Parser::new(&grammar);
     match parser.parse("aabc") {
-        Ok(result) => {
-            for (symbol, index) in result {
+        true => {
+            for (symbol, index) in parser.analysis_stack {
                 print!("({}, {})", symbol, index)
             }
         }
-        Err(unknown) => println!("Err: {}", unknown),
+        false => {
+            for diagnostic in parser.diagnostics {
+                println!("Err: {}", diagnostic)
+            }
+        }
     }
 }
