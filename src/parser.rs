@@ -74,7 +74,7 @@ impl<'a, G: Grammar + Debug + Clone> Parser<'a, G> {
 
                                     self.analysis_stack.push((left, index + 1));
 
-                                    for &symbol in symbols.clone().iter().rev() {
+                                    for &symbol in symbols.iter().rev() {
                                         self.stack.push((symbol, 0))
                                     }
                                 }
